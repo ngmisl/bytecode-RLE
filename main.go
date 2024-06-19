@@ -2,15 +2,15 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 )
 
 // ReadFile reads the content of the file at the given path
 func ReadFile(path string) (string, error) {
-	data, err := os.ReadFile(path)
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
@@ -19,40 +19,72 @@ func ReadFile(path string) (string, error) {
 
 // WriteFile writes the content to the file at the given path
 func WriteFile(path string, data string) error {
-	return os.WriteFile(path, []byte(data), 0644)
+	return ioutil.WriteFile(path, []byte(data), 0644)
 }
 
-// RLEncode compresses the input string using Run-Length Encoding
+// RLEncode compresses the input string using Run-Length Encoding, excluding blocks of digits
 func RLEncode(input string) string {
 	var encoded strings.Builder
 	count := 1
 	for i := 1; i < len(input); i++ {
-		if input[i] == input[i-1] {
+		if isDigit(input[i]) && isDigit(input[i-1]) {
+			continue
+		} else if input[i] == input[i-1] && !isDigit(input[i]) {
 			count++
 		} else {
-			encoded.WriteString(string(input[i-1]) + "-" + strconv.Itoa(count) + "-")
+			if isDigit(input[i-1]) {
+				start := i - 1
+				for start > 0 && isDigit(input[start-1]) {
+					start--
+				}
+				encoded.WriteString("|" + input[start:i] + "|")
+			} else {
+				encoded.WriteString(string(input[i-1]) + strconv.Itoa(count))
+			}
 			count = 1
 		}
 	}
-	encoded.WriteString(string(input[len(input)-1]) + "-" + strconv.Itoa(count))
+	if isDigit(input[len(input)-1]) {
+		start := len(input) - 1
+		for start > 0 && isDigit(input[start-1]) {
+			start--
+		}
+		encoded.WriteString("|" + input[start:] + "|")
+	} else {
+		encoded.WriteString(string(input[len(input)-1]) + strconv.Itoa(count))
+	}
 	return encoded.String()
 }
 
 // RLDecode decompresses the RLE encoded string
 func RLDecode(input string) string {
 	var decoded strings.Builder
-	parts := strings.Split(input, "-")
-	for i := 0; i < len(parts); i += 2 {
-		if i+1 < len(parts) {
-			char := parts[i]
-			count, err := strconv.Atoi(parts[i+1])
+	i := 0
+	for i < len(input) {
+		if input[i] == '|' {
+			end := strings.IndexByte(input[i+1:], '|') + i + 1
+			decoded.WriteString(input[i+1 : end])
+			i = end + 1
+		} else {
+			char := input[i]
+			countStart := i + 1
+			for countStart < len(input) && isDigit(input[countStart]) {
+				countStart++
+			}
+			count, err := strconv.Atoi(input[i+1 : countStart])
 			if err != nil {
 				log.Fatalf("Invalid RLE string: %v", err)
 			}
-			decoded.WriteString(strings.Repeat(char, count))
+			decoded.WriteString(strings.Repeat(string(char), count))
+			i = countStart
 		}
 	}
 	return decoded.String()
+}
+
+// isDigit checks if a byte is a digit
+func isDigit(b byte) bool {
+	return b >= '0' && b <= '9'
 }
 
 func main() {
