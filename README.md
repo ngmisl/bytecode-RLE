@@ -1,5 +1,5 @@
 # bytecode-RLE
 
-Idea was to use RLE to compress EVM bytecodes. Spoiler: it's not feasible
+Idea was to use RLE to compress EVM bytecodes.
 
-Spoiler 2: or is it? Excluding digit blocks now, coming very close
+It does so by encoding chunks of f's
