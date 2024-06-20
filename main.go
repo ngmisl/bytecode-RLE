@@ -12,42 +12,43 @@ import (
 func ReadFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("error reading file %s: %w", path, err)
 	}
 	return string(data), nil
 }
 
 // WriteFile writes the content to the file at the given path
 func WriteFile(path string, data string) error {
-	return os.WriteFile(path, []byte(data), 0644)
+	err := os.WriteFile(path, []byte(data), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing file %s: %w", path, err)
+	}
+	return nil
 }
 
 // RLEncode compresses the input string using Run-Length Encoding for 'f' and '0' chunks with more than 4 occurrences
 func RLEncode(input string) string {
+	const threshold = 4
 	var encoded strings.Builder
 	count := 1
 	for i := 1; i < len(input); i++ {
 		if (input[i] == 'f' || input[i] == '0') && input[i] == input[i-1] {
 			count++
 		} else {
-			if input[i-1] == 'f' && count > 4 {
-				encoded.WriteString("|f" + strconv.Itoa(count) + "|")
-			} else if input[i-1] == '0' && count > 4 {
-				encoded.WriteString("|0" + strconv.Itoa(count) + "|")
-			} else {
-				encoded.WriteString(strings.Repeat(string(input[i-1]), count))
-			}
+			encodeChunk(&encoded, input[i-1], count, threshold)
 			count = 1
 		}
 	}
-	if input[len(input)-1] == 'f' && count > 4 {
-		encoded.WriteString("|f" + strconv.Itoa(count) + "|")
-	} else if input[len(input)-1] == '0' && count > 4 {
-		encoded.WriteString("|0" + strconv.Itoa(count) + "|")
-	} else {
-		encoded.WriteString(strings.Repeat(string(input[len(input)-1]), count))
-	}
+	encodeChunk(&encoded, input[len(input)-1], count, threshold)
 	return encoded.String()
+}
+
+func encodeChunk(encoded *strings.Builder, char byte, count, threshold int) {
+	if (char == 'f' || char == '0') && count > threshold {
+		encoded.WriteString("|" + string(char) + strconv.Itoa(count) + "|")
+	} else {
+		encoded.WriteString(strings.Repeat(string(char), count))
+	}
 }
 
 // RLDecode decompresses the RLE encoded string
@@ -84,7 +85,7 @@ func isDigit(b byte) bool {
 
 func main() {
 	// Read data from the file
-	filePath := "data.txt"
+	const filePath = "data.txt"
 	data, err := ReadFile(filePath)
 	if err != nil {
 		log.Fatalf("Failed to read file: %v", err)
@@ -114,7 +115,7 @@ func main() {
 
 	// Save compressed data to file if ratio is better than 1
 	if compressionRatio > 1 {
-		compressedFilePath := "compressed.txt"
+		const compressedFilePath = "compressed.txt"
 		err = WriteFile(compressedFilePath, encodedData)
 		if err != nil {
 			log.Fatalf("Failed to write compressed file: %v", err)
