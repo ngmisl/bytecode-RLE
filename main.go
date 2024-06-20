@@ -22,16 +22,18 @@ func WriteFile(path string, data string) error {
 	return os.WriteFile(path, []byte(data), 0644)
 }
 
-// RLEncode compresses the input string using Run-Length Encoding for 'f' chunks with more than 4 occurrences
+// RLEncode compresses the input string using Run-Length Encoding for 'f' and '0' chunks with more than 4 occurrences
 func RLEncode(input string) string {
 	var encoded strings.Builder
 	count := 1
 	for i := 1; i < len(input); i++ {
-		if input[i] == 'f' && input[i] == input[i-1] {
+		if (input[i] == 'f' || input[i] == '0') && input[i] == input[i-1] {
 			count++
 		} else {
 			if input[i-1] == 'f' && count > 4 {
 				encoded.WriteString("|f" + strconv.Itoa(count) + "|")
+			} else if input[i-1] == '0' && count > 4 {
+				encoded.WriteString("|0" + strconv.Itoa(count) + "|")
 			} else {
 				encoded.WriteString(strings.Repeat(string(input[i-1]), count))
 			}
@@ -40,6 +42,8 @@ func RLEncode(input string) string {
 	}
 	if input[len(input)-1] == 'f' && count > 4 {
 		encoded.WriteString("|f" + strconv.Itoa(count) + "|")
+	} else if input[len(input)-1] == '0' && count > 4 {
+		encoded.WriteString("|0" + strconv.Itoa(count) + "|")
 	} else {
 		encoded.WriteString(strings.Repeat(string(input[len(input)-1]), count))
 	}
@@ -52,19 +56,19 @@ func RLDecode(input string) string {
 	i := 0
 	for i < len(input) {
 		if input[i] == '|' {
-			if input[i+1] == 'f' {
-				i += 2
-				countStart := i
-				for i < len(input) && isDigit(input[i]) {
-					i++
-				}
-				count, err := strconv.Atoi(input[countStart:i])
-				if err != nil {
-					log.Fatalf("Invalid RLE string: %v", err)
-				}
-				decoded.WriteString(strings.Repeat("f", count))
-				i++ // Skip the closing '|'
+			i++
+			char := input[i]
+			i++
+			countStart := i
+			for i < len(input) && isDigit(input[i]) {
+				i++
 			}
+			count, err := strconv.Atoi(input[countStart:i])
+			if err != nil {
+				log.Fatalf("Invalid RLE string: %v", err)
+			}
+			decoded.WriteString(strings.Repeat(string(char), count))
+			i++ // Skip the closing '|'
 		} else {
 			decoded.WriteByte(input[i])
 			i++
